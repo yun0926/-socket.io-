@@ -1,0 +1,97 @@
+<!doctype html>
+<html>
+    <head>
+        <title>chat</title>
+        <meta charset="utf-8"/>
+        <link rel='stylesheet' href='css/style.css'></link>
+    </head>
+    <body>
+        <div id='content'>
+            <!--显示当前聊天室名称的div-->
+            <div id='room'></div>  
+            <!--显示当前可用聊天室列表的div-->
+            <div id="room-list"></div>
+            <!--显示聊天消息的div-->
+            <div id='messages'></div>   
+            <form id='send-form'>
+                <!--用户用来输入聊天命令和消息的表单输入元素-->
+                <input id='send-message'/>  
+                <input id='send-button' type='button' value='send'/>
+                
+                <div id='help'>
+                    Chat commands:
+                    <ul>
+                        <li>change nickname:<code>/nick [username]</code></li>
+                        <li>Join.create room:<code>join [room name]</code></li>
+                    </ul>
+                </div>
+            </form>
+        </div>
+
+        <script src = '/socket.io/socket.io.js' type='text/javascript'></script>
+        <script type="text/javascript" src="http://apps.bdimg.com/libs/jquery/2.1.4/jquery.min.js"></script>
+        <script src = 'javascript/chat.js' type='text/javascript'></script>
+        <script src = 'javascript/chat_ui.js' type='text/javascript'></script>
+        <script type='text/javascript'>
+            //客户端程序初始化逻辑
+            var socket = io.connect();
+            $(document).ready(function(){
+                var chatApp = new Chat(socket);
+
+                //显示更名尝试的结果
+                socket.on('nameResult',function(result){   
+                    var message;
+                    if(result.success){
+                        message = 'You are now known as' + result.name + '.';
+                    }else{
+                        message - result.message;
+                    }
+                    $("#messages").append(divSystemContentElement(message));
+                })
+
+                //显示房间变更结果
+                socket.on('joinResult',function(result){   
+                    $("#room").text(result.room);
+                    $("#messages").append(divSystemContentElement("Room changed."));
+                })
+
+                //显示接收到的消息
+                socket.on('message',function(message){
+                    var newElement = $("<div></div>").text(message.text);
+                    $("#messages").append(newElement);
+                })
+
+                //显示可用房间列表
+                socket.on('rooms',function(rooms){
+                    $("#room-list").empty();
+
+                    for(var room in rooms){
+                        room = room.substring(1,room.length);
+                        if(room!=""){
+                            $("#room-list").append(divEscapedContentElement(room));
+                        }
+                    }
+
+                    //点击房间名可以切换到哪个房间中
+                    $("#room-list div").click(function(){
+                        chatApp.processCommand('/join'+$(this).text());
+                        $("#send-message").focus();
+                    })
+                })
+
+                //定期请求可用房间列表
+                setInterval(function(){
+                    socket.emit('rooms');
+                },1000);
+
+                $("#send-message").focus();
+
+                //提交表单可以发送聊天消息
+                $("#send-button").on('click',function(){
+                    processUserInput(chatApp,socket);
+                    return false;
+                })
+            })
+        </script>        
+    </body>
+</html>
